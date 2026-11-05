@@ -120,7 +120,16 @@ export class ExecutionData implements INodeType {
 
 					const values = dataToSave.reduce(
 						(acc, { key, value }) => {
-							const valueToSet = value ? value : nodeVersion >= 1.1 ? '' : value;
+							// Only nullish values are "empty". Expressions can resolve to
+							// non-string values like `false` or `0`, which are stored as text.
+							const isNullish = value === undefined || value === null;
+							const valueToSet = isNullish
+								? nodeVersion >= 1.1
+									? ''
+									: value
+								: ['boolean', 'number', 'bigint'].includes(typeof value)
+									? String(value as unknown)
+									: value;
 							acc[key] = valueToSet;
 							return acc;
 						},

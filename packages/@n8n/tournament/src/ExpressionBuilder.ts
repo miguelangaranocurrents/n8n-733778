@@ -137,7 +137,25 @@ const fixStringNewLines = (node: types.namedTypes.File): types.namedTypes.File =
 	const replace = (str: string): string => {
 		return str.replace(/\n/g, '\\n');
 	};
+	const hasNewLine = (str: string | null | undefined) => !!str && str.includes('\n');
 	visit(node, {
+		visitTemplateLiteral(path) {
+			const needsRewrite = path.node.quasis.some(
+				(q) => hasNewLine(q.value.raw) || hasNewLine(q.value.cooked),
+			);
+			this.traverse(path);
+			if (!needsRewrite) return;
+			// Replace the whole literal with a fresh node that recast must print
+			// generically. Otherwise recast patches each rewritten quasi into the
+			// original source and, when a quasi ends in an identifier character
+			// right before `${`, inserts a separating space *inside* the string.
+			const literal = b.templateLiteral(
+				path.node.quasis,
+				path.node.expressions as ExpressionKind[],
+			);
+			(literal as typeof literal & { original: null }).original = null;
+			path.replace(literal);
+		},
 		visitTemplateElement(path) {
 			this.traverse(path);
 			const el = b.templateElement(
